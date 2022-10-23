@@ -16,7 +16,7 @@ app.get('/', (req, res) => {
 
 app.get('/expenses', async (req, res) => {
   try {
-    const users = await User.find()
+    const userss = await User.find()
 
     const ex = [
       {
