@@ -1,5 +1,6 @@
 require('dotenv').config()
 const express = require('express')
+const bodyParser = require('body-parser')
 const app = express()
 const port = process.env.PORT || 3000
 
@@ -8,45 +9,48 @@ const Expenses = require('./models/expenses')
 const Group = require('./models/groups')
 const mongoose = require('mongoose')
 const users = require('./models/users')
-const { sum, ap } = require('ramda')
+const { sum } = require('ramda')
+
+app.use(bodyParser.json())
 
 app.get('/', (req, res) => {
   res.send('Give me my money!')
 })
 
-// app.get('/expenses', async (req, res) => {
-//   try {
-//     const userss = await User.find()
+app.post('/addExpenses', async (req, res) => {
+  try {
+    const { groupId, paidBy, paymentType, split } = req.body
+    const totalAmount = Number(req.body.totalAmount)
+    if (!totalAmount) return res.status(400).json({ message: 'Please enter valid totalAmount' })
+    const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId) }).lean()
+    if (!group) return res.status(400).json({ message: 'Group not found' })
 
-//     const ex = [
-//       {
-//         group: "63516558ad85c014e228a50c",
-//         totalAmount: 129,
-//         paidBy: "635026696feb96318d93f875",
-//         split: [{
-//             useruid: "635026696feb96318d93f873", 
-//             splitAmount: 30
-//         },
-//         {
-//           useruid: "635026696feb96318d93f875", 
-//           splitAmount: 0
-//       },
-//       {
-//         useruid: "635026696feb96318d93f874", 
-//         splitAmount: 99
-//       }
-//       ],
-//         paymentType: 'SETTELUP'
-//       },
-//     ]
+    const validPaidBy = group.members.every(m => m.toString() !== paidBy.toString())
+    if (validPaidBy) return res.status(400).json({ message: 'Invalid paid by id'})
 
-//     const eee = await Expenses.insertMany(ex)
-//     res.json(eee)
-//   } catch (error) {
-//     console.log(error)
-//     res.status(500).json({ message: error.message })
-//   }
-// })
+    const validMembers = split.some((member) => group.members.every(m => m.toString() !== member.useruid.toString()))
+    if (validMembers) return res.status(400).json({ message: 'Invalid split user id'})
+
+    if (totalAmount !== parseFloat(sum(split.map(m => Number(m.splitAmount))).toFixed(2))) {
+      return res.status(400).json({ message: 'Wrong split amount'})
+    }
+    const ex = [
+      {
+        group: groupId,
+        totalAmount,
+        paidBy,
+        split,
+        paymentType
+      },
+    ]
+
+    const eee = await Expenses.insertMany(ex)
+    res.json(eee)
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: error.message })
+  }
+})
 
 app.get('/calculate', async (req, res) => {
   try {
@@ -131,31 +135,48 @@ app.get('/calculate', async (req, res) => {
         if (remaining === 0) {
           continue
         } else {
-          console.log(Math.abs(remaining) , aboveZero[j].balance)
           if (Math.abs(remaining) > aboveZero[j].balance) {
             //owe.push(`${belewZero[i].name} should pay ${Math.abs(aboveZero[j].balance)} to ${aboveZero[j].name}`)
             owe.push({
-              shoulPay: belewZero[i],
-              shouldReceive: aboveZero[j],
-              amount: Math.abs(aboveZero[j].balance)
+              shoulPay: {
+                _id: belewZero[i]._id,
+                name: belewZero[i].name
+              },
+              shouldReceive: {
+                _id: aboveZero[j]._id,
+                name: aboveZero[j].name
+              },
+              amount: parseFloat(Math.abs(aboveZero[j].balance).toFixed(2))
             })
             remaining = remaining + aboveZero[j].balance
             aboveZero[j].balance = 0
           } 
           else if (Math.abs(remaining) < aboveZero[j].balance) {
-            owe.push(`${belewZero[i].name} should pay ${Math.abs(remaining)} to ${aboveZero[j].name}`)
-            // owe.push({
-            //   shoulPay: belewZero[i],
-            //   shouldReceive: aboveZero[j],
-            //   amount: Math.abs(remaining)
-            // })
-            aboveZero[j].balance = aboveZero[j].balance - Math.abs(remaining)
+            // owe.push(`${belewZero[i].name} should pay ${Math.abs(remaining)} to ${aboveZero[j].name}`)
+            owe.push({
+              shoulPay: {
+                _id: belewZero[i]._id,
+                name: belewZero[i].name
+              },
+              shouldReceive: {
+                _id: aboveZero[j]._id,
+                name: aboveZero[j].name
+              },
+              amount: parseFloat(Math.abs(remaining).toFixed(2))
+            })
+            aboveZero[j].balance = aboveZero[j].balance - parseFloat(Math.abs(remaining).toFixed(2))
             remaining = 0
           } else {
             owe.push({
-              shoulPay: belewZero[i],
-              shouldReceive: aboveZero[j],
-              amount: Math.abs(aboveZero[j].balance)
+              shoulPay: {
+                _id: belewZero[i]._id,
+                name: belewZero[i].name
+              },
+              shouldReceive: {
+                _id: aboveZero[j]._id,
+                name: aboveZero[j].name
+              },
+              amount: parseFloat(Math.abs(aboveZero[j].balance).toFixed(2))
             })
             remaining = 0
             aboveZero[j].balance = 0
