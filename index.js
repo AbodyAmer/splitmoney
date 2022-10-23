@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const app = express()
-const port = 3000
+const port = process.env.PORT || 3000
 
 const User = require('./models/users')
 const Expenses = require('./models/expenses')
@@ -14,39 +14,39 @@ app.get('/', (req, res) => {
   res.send('Give me my money!')
 })
 
-app.get('/expenses', async (req, res) => {
-  try {
-    const userss = await User.find()
+// app.get('/expenses', async (req, res) => {
+//   try {
+//     const userss = await User.find()
 
-    const ex = [
-      {
-        group: "63516558ad85c014e228a50c",
-        totalAmount: 129,
-        paidBy: "635026696feb96318d93f875",
-        split: [{
-            useruid: "635026696feb96318d93f873", 
-            splitAmount: 30
-        },
-        {
-          useruid: "635026696feb96318d93f875", 
-          splitAmount: 0
-      },
-      {
-        useruid: "635026696feb96318d93f874", 
-        splitAmount: 99
-      }
-      ],
-        paymentType: 'SETTELUP'
-      },
-    ]
+//     const ex = [
+//       {
+//         group: "63516558ad85c014e228a50c",
+//         totalAmount: 129,
+//         paidBy: "635026696feb96318d93f875",
+//         split: [{
+//             useruid: "635026696feb96318d93f873", 
+//             splitAmount: 30
+//         },
+//         {
+//           useruid: "635026696feb96318d93f875", 
+//           splitAmount: 0
+//       },
+//       {
+//         useruid: "635026696feb96318d93f874", 
+//         splitAmount: 99
+//       }
+//       ],
+//         paymentType: 'SETTELUP'
+//       },
+//     ]
 
-    const eee = await Expenses.insertMany(ex)
-    res.json(eee)
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({ message: error.message })
-  }
-})
+//     const eee = await Expenses.insertMany(ex)
+//     res.json(eee)
+//   } catch (error) {
+//     console.log(error)
+//     res.status(500).json({ message: error.message })
+//   }
+// })
 
 app.get('/calculate', async (req, res) => {
   try {
@@ -118,8 +118,6 @@ app.get('/calculate', async (req, res) => {
       m.didPay = sum(report.didPay.filter(sp => sp.user._id.toString() === m._id.toString()).map(sp => sp.didPay))
       m.balance = m.didPay - m.shoulPay
       m.balanceBeforeSettle = m.balance
-      console.log(m.shoulPay)
-      console.log(m.didPay)
       return m
     })
   
@@ -135,12 +133,12 @@ app.get('/calculate', async (req, res) => {
         } else {
           console.log(Math.abs(remaining) , aboveZero[j].balance)
           if (Math.abs(remaining) > aboveZero[j].balance) {
-            owe.push(`${belewZero[i].name} should pay ${Math.abs(aboveZero[j].balance)} to ${aboveZero[j].name}`)
-            // owe.push({
-            //   shoulPay: belewZero[i],
-            //   shouldReceive: aboveZero[j],
-            //   amount: Math.abs(aboveZero[j].balance)
-            // })
+            //owe.push(`${belewZero[i].name} should pay ${Math.abs(aboveZero[j].balance)} to ${aboveZero[j].name}`)
+            owe.push({
+              shoulPay: belewZero[i],
+              shouldReceive: aboveZero[j],
+              amount: Math.abs(aboveZero[j].balance)
+            })
             remaining = remaining + aboveZero[j].balance
             aboveZero[j].balance = 0
           } 
