@@ -8,6 +8,6 @@ const groupSchema = new Schema({
         required: true,
         index: true,
     }]
-})
+}, { timestamps: true })
 
 module.exports = model('Group', groupSchema)

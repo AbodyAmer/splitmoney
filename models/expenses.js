@@ -11,7 +11,9 @@ const expensesSchema = new Schema({
     paymentType: { 
         type: String,
         enum : ['SETTELUP','EQUAL', 'UNEQUAL', 'PERCENTAGE']
-    }
-})
+    },
+    createdBy: { type: Schema.ObjectId, ref: 'User', required: true },
+    modifiedBy: { type: Schema.ObjectId, ref: 'User', required: true }
+}, { timestamps: true })
 
 module.exports = model('expenses', expensesSchema)

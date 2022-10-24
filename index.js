@@ -9,14 +9,17 @@ const Expenses = require('./models/expenses')
 const Group = require('./models/groups')
 const mongoose = require('mongoose')
 const users = require('./models/users')
+const UserRoute = require('./api/users')
 const { sum } = require('ramda')
 
 app.use(bodyParser.json())
+app.use('/users', UserRoute)
 
 app.get('/', (req, res) => {
   res.send('Give me my money!')
 })
-
+// Users
+// Expenses
 app.post('/addExpenses', async (req, res) => {
   try {
     const { groupId, paidBy, paymentType, split } = req.body
@@ -45,6 +48,39 @@ app.post('/addExpenses', async (req, res) => {
     ]
 
     const eee = await Expenses.insertMany(ex)
+    res.json(eee)
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: error.message })
+  }
+})
+
+app.post('/editExpenses', async (req, res) => {
+  try {
+    const { groupId, expensesId, paidBy, paymentType, split } = req.body
+    const totalAmount = Number(req.body.totalAmount)
+    if (!totalAmount) return res.status(400).json({ message: 'Please enter valid totalAmount' })
+    const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId) }).lean()
+    if (!group) return res.status(400).json({ message: 'Group not found' })
+  
+    const validPaidBy = group.members.every(m => m.toString() !== paidBy.toString())
+    if (validPaidBy) return res.status(400).json({ message: 'Invalid paid by id'})
+  
+    const validMembers = split.some((member) => group.members.every(m => m.toString() !== member.useruid.toString()))
+    if (validMembers) return res.status(400).json({ message: 'Invalid split user id'})
+  
+    if (totalAmount !== parseFloat(sum(split.map(m => Number(m.splitAmount))).toFixed(2))) {
+      return res.status(400).json({ message: 'Wrong split amount'})
+    }
+    const ex = 
+      {
+        totalAmount,
+        paidBy,
+        split,
+        paymentType
+      }
+  
+    const eee = await Expenses.updateOne({ _id: mongoose.Types.ObjectId(expensesId), group: groupId }, ex)
     res.json(eee)
   } catch (error) {
     console.log(error)
