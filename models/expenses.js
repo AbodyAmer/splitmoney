@@ -1,4 +1,4 @@
-const { Schema, model } = require('../config/mongodb')
+import { model, Schema } from '../config/mongodb.js'
 
 const expensesSchema = new Schema({
     totalAmount: { type: Number, required: true },
@@ -12,8 +12,9 @@ const expensesSchema = new Schema({
         type: String,
         enum : ['SETTELUP','EQUAL', 'UNEQUAL', 'PERCENTAGE']
     },
+    isRemoved: { type: Boolean, default: false },
     createdBy: { type: Schema.ObjectId, ref: 'User', required: true },
-    modifiedBy: { type: Schema.ObjectId, ref: 'User', required: true }
+    updatedBy: { type: Schema.ObjectId, ref: 'User', required: true }
 }, { timestamps: true })
 
-module.exports = model('expenses', expensesSchema)
+export default model('expenses', expensesSchema)

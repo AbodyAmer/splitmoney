@@ -1,6 +1,6 @@
-const { Schema, model } = require('../config/mongodb')
-const isEmail = require('validator/lib/isEmail')
-var crypto = require('crypto'); 
+import { Schema, model } from '../config/mongodb.js'
+import isEmail from 'validator/lib/isEmail.js'
+import crypto from 'crypto'
 
 const userSchema = new Schema({
     name: String,
@@ -25,10 +25,10 @@ userSchema.methods.setPassword = function(password) {
        1000, 64, `sha512`).toString(`hex`); 
    }; 
    // Method to check the entered password is correct or not 
-   userSchema.methods.validPassword = function(password) { 
-       var hash = crypto.pbkdf2Sync(password,  
-       this.salt, 1000, 64, `sha512`).toString(`hex`); 
-       return this.hash === hash; 
-   }; 
+userSchema.methods.validPassword = function(password) { 
+    var hash = crypto.pbkdf2Sync(password,  
+    this.salt, 1000, 64, `sha512`).toString(`hex`); 
+    return this.hash === hash; 
+}; 
 
-module.exports = model('User', userSchema)
+export default model('User', userSchema)

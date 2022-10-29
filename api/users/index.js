@@ -1,6 +1,10 @@
-const User = require('../../models/users')
-const router = require('express').Router()
-const isEmail = require('validator/lib/isEmail')
+import User from '../../models/users.js'
+import express from 'express'
+import isEmail from 'validator/lib/isEmail.js'
+import Session from '../../models/sessions.js'
+import jwt from 'jsonwebtoken'
+
+const router = express.Router()
 
 router.post('/register', async (req, res) => {
     try {
@@ -24,4 +28,41 @@ router.post('/register', async (req, res) => {
     }
 })
 
-module.exports = router
+router.post('/passwordLogin', async (req, res) => {
+    try {
+        const { password } = req.body
+        const email = req.body.email?.trim().toLowerCase()
+        const user = await User.findOne({ email })
+        if (!user) return res.status(401).json({ message: 'User not found' })
+        if (!user.validPassword(password)) return res.status(401).json({ message: 'Wrong password' })
+
+        const session = new Session()
+        session.useruid = user._id
+        const newSession = await session.save()
+        const token = jwt.sign({ 
+            email: user.email,
+            name: user.name,
+            sessionuid: newSession._id.toString()
+         }, process.env.JWT_SECRET);
+        return res.json({ token })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: error.message })
+    }
+})
+
+router.get('/logout', async (req, res) => {
+    try {
+        const { authorization } = req.headers
+        if (!authorization) return res.status(401).end()
+        const session = jwt.verify(authorization, process.env.JWT_SECRET)
+        const updateSession = await Session.updateOne({ _id: session.sessionuid, status: 'ACTIVE' }, { status: 'INACTVIE' })
+        if (updateSession.modifiedCount) return res.end('OK')
+        return res.status(401).end()
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: error.message })
+    }
+})
+
+export default router
