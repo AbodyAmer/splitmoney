@@ -9,104 +9,18 @@ const port = process.env.PORT || 3000
 import Expenses from './models/expenses.js'
 import Group from './models/groups.js'
 import mongoose from 'mongoose'
-import users from './models/users.js'
 import UserRoute from './api/users/index.js'
 import GroupRoute from './api/group/index.js'
-import { isLogged } from './api/middelware/index.js'
+import ExpensesRoute from './api/expenses/index.js'
 import { sum } from 'ramda'
 
 app.use(bodyParser.json())
 app.use('/users', UserRoute)
 app.use('/groups', GroupRoute)
+app.use('/expenses', ExpensesRoute)
 
 app.get('/', (req, res) => {
   res.send('Give me my money!')
-})
-// Users
-// Expenses
-app.post('/addExpenses', isLogged, async (req, res) => {
-  try {
-    const { groupId, paidBy, paymentType, split } = req.body
-    const totalAmount = Number(req.body.totalAmount)
-    if (!totalAmount) return res.status(400).json({ message: 'Please enter valid totalAmount' })
-    const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId) }).lean()
-    if (!group) return res.status(400).json({ message: 'Group not found' })
-
-    const validPaidBy = group.members.every(m => m.toString() !== paidBy.toString())
-    if (validPaidBy) return res.status(400).json({ message: 'Invalid paid by id' })
-
-    const validMembers = split.some((member) => group.members.every(m => m.toString() !== member.useruid.toString()))
-    if (validMembers) return res.status(400).json({ message: 'Invalid split user id' })
-
-    if (totalAmount !== parseFloat(sum(split.map(m => Number(m.splitAmount))).toFixed(2))) {
-      return res.status(400).json({ message: 'Wrong split amount' })
-    }
-    const ex = [
-      {
-        group: groupId,
-        totalAmount,
-        paidBy,
-        split,
-        paymentType,
-        createdBy: req.user._id,
-        updatedBy: req.user._id
-      },
-    ]
-
-    const eee = await Expenses.insertMany(ex)
-    res.json(eee)
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({ message: error.message })
-  }
-})
-
-app.post('/editExpenses', isLogged, async (req, res) => {
-  try {
-    const { groupId, expensesId, paidBy, paymentType, split } = req.body
-    const totalAmount = Number(req.body.totalAmount)
-    if (!totalAmount) return res.status(400).json({ message: 'Please enter valid totalAmount' })
-    const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId) }).lean()
-    if (!group) return res.status(400).json({ message: 'Group not found' })
-
-    const validPaidBy = group.members.every(m => m.toString() !== paidBy.toString())
-    if (validPaidBy) return res.status(400).json({ message: 'Invalid paid by id' })
-
-    const validMembers = split.some((member) => group.members.every(m => m.toString() !== member.useruid.toString()))
-    if (validMembers) return res.status(400).json({ message: 'Invalid split user id' })
-
-    if (totalAmount !== parseFloat(sum(split.map(m => Number(m.splitAmount))).toFixed(2))) {
-      return res.status(400).json({ message: 'Wrong split amount' })
-    }
-    const ex =
-    {
-      totalAmount,
-      paidBy,
-      split,
-      paymentType
-    }
-
-    const eee = await Expenses.updateOne({
-      _id: mongoose.Types.ObjectId(expensesId), 
-      group: groupId,
-      isRemoved: { $ne: true },
-      members: mongoose.Types.ObjectId(req.user._id)
-    },
-      ex)
-    res.json(eee)
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({ message: error.message })
-  }
-})
-
-app.post('/deleteExpenses', isLogged, async (req, res) => {
-  try {
-    res.json(req.user)
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({ message: error.message })
-  }
 })
 
 app.get('/calculate', async (req, res) => {
@@ -251,19 +165,6 @@ app.get('/calculate', async (req, res) => {
     console.log(error)
     res.status(500).json({ message: 'INTERNAL SERVER ERROR' })
   }
-})
-
-app.get('/group', async (req, res) => {
-  const group = new Group({
-    name: 'East lake',
-    members: [
-      "635026696feb96318d93f873",
-      "635026696feb96318d93f874",
-      "635026696feb96318d93f875"
-    ]
-  })
-  await group.save()
-  res.end('ok')
 })
 
 app.listen(port, () => {

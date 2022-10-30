@@ -2,7 +2,7 @@ import Group from '../../models/groups.js'
 import express from 'express'
 import { isLogged } from '../middelware/index.js'
 import mongoose from 'mongoose'
-import { sum } from 'ramda'
+import calculatePayments from '../utils/calculatePayments.js'
 import calculateDebt from '../utils/calculateDebt.js'
 
 const router = express.Router()
@@ -48,7 +48,7 @@ router.post('/deleteMember', isLogged, async (req, res) => {
         const { groupId, memberId } = req.body
         const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id), mongoose.Types.ObjectId(memberId)]} }).lean()
         if (!group) return res.status(400).json({ message: 'Group or member not found'})
-        const { justZero } = await calculateDebt(groupId)
+        const { justZero } = await calculatePayments(groupId)
           if (justZero.find(m => m.toString() === memberId)) {
             const members = group.members.filter(m => m.toString() !== memberId)
             await Group.updateOne({ _id: group._id }, { members })
@@ -67,7 +67,7 @@ router.post('/delete', isLogged, async (req, res) => {
         const { groupId } = req.body
         const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id)]} }).lean()
         if (!group) return res.status(400).json({ message: 'Group or member not found'})
-        const { justZero } = await calculateDebt(groupId)
+        const { justZero } = await calculatePayments(groupId)
         const everyoneDone = group.members.every(member => justZero.find(m => m.toString() === member.toString()))
         if (!everyoneDone) {
             return res.status(400).json({ message: 'Clear group debt before deleting the group' })  
@@ -77,6 +77,21 @@ router.post('/delete', isLogged, async (req, res) => {
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: 'Internal server error' })
+    }
+})
+
+router.get('/mygroups', isLogged, async (req, res) => {
+    try {
+        const groups = await Group.find({ members: { $in: [mongoose.Types.ObjectId(req.user._id)]} }).lean()
+        const g = await Promise.all(groups.map(async group => {
+            const { aboveZero, belewZero } = await calculatePayments(group._id)
+            group.own = calculateDebt(belewZero, aboveZero)
+            return group
+        }))
+        return res.json(g)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'Internal server error' }) 
     }
 })
 export default router

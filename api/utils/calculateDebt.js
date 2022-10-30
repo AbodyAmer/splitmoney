@@ -1,84 +1,62 @@
-import Group from "../../models/groups.js"
-import Expenses from "../../models/expenses.js"
-import mongoose from "mongoose"
-import { sum } from 'ramda'
-
-const calculateDebt = async (groupId) => {
-    const group = await Group.findById(groupId)
-    const totalPayments = await Expenses.aggregate([
-        {
-          $match: {
-            group: mongoose.Types.ObjectId(groupId),
-            isRemoved: { $ne: true }
+const calculateDebt = (belewZero, aboveZero) => {
+    const owe = []
+    for (let i = 0; i < belewZero.length; i++) {
+      let remaining = belewZero[i].balance
+      for (let j = 0; j < aboveZero.length; j++) {
+        if (remaining === 0) {
+          continue
+        } else {
+          if (Math.abs(remaining) > aboveZero[j].balance) {
+            //owe.push(`${belewZero[i].name} should pay ${Math.abs(aboveZero[j].balance)} to ${aboveZero[j].name}`)
+            owe.push({
+              shoulPay: {
+                _id: belewZero[i]._id,
+                name: belewZero[i].name
+              },
+              shouldReceive: {
+                _id: aboveZero[j]._id,
+                name: aboveZero[j].name
+              },
+              amount: parseFloat(Math.abs(aboveZero[j].balance).toFixed(2))
+            })
+            remaining = remaining + aboveZero[j].balance
+            aboveZero[j].balance = 0
           }
-        },
-        {
-          $facet:
-          {
-            shoulPay: [
-              {
-                $unwind:
-                  '$split'
-  
+          else if (Math.abs(remaining) < aboveZero[j].balance) {
+            // owe.push(`${belewZero[i].name} should pay ${Math.abs(remaining)} to ${aboveZero[j].name}`)
+            owe.push({
+              shoulPay: {
+                _id: belewZero[i]._id,
+                name: belewZero[i].name
               },
-              {
-                $group: {
-                  _id: {
-                    shouldPay: '$split.useruid'
-                  },
-                  shouldPay: { $sum: '$split.splitAmount' }
-                }
+              shouldReceive: {
+                _id: aboveZero[j]._id,
+                name: aboveZero[j].name
               },
-              {
-                $lookup: {
-                  from: "users",
-                  localField: "_id.shouldPay",
-                  foreignField: "_id",
-                  as: "user"
-                }
-              }, {
-                $unwind: '$user'
-              }
-            ],
-            didPay: [
-              {
-                $group: {
-                  _id: { didPay: '$paidBy' }
-                  ,
-                  didPay: { $sum: '$totalAmount' }
-                }
+              amount: parseFloat(Math.abs(remaining).toFixed(2))
+            })
+            aboveZero[j].balance = aboveZero[j].balance - parseFloat(Math.abs(remaining).toFixed(2))
+            remaining = 0
+          } else {
+            owe.push({
+              shoulPay: {
+                _id: belewZero[i]._id,
+                name: belewZero[i].name
               },
-              {
-                $lookup: {
-                  from: "users",
-                  localField: "_id.didPay",
-                  foreignField: "_id",
-                  as: "user"
-                }
-              }, {
-                $unwind: '$user'
-              }
-            ]
+              shouldReceive: {
+                _id: aboveZero[j]._id,
+                name: aboveZero[j].name
+              },
+              amount: parseFloat(Math.abs(aboveZero[j].balance).toFixed(2))
+            })
+            remaining = 0
+            aboveZero[j].balance = 0
           }
         }
-      ])
-      const report = totalPayments[0]
-      group.members.forEach(m => {
-        m.shoulPay = sum(report.shoulPay.filter(sp => sp.user._id.toString() === m._id.toString()).map(sp => sp.shouldPay))
-        m.didPay = sum(report.didPay.filter(sp => sp.user._id.toString() === m._id.toString()).map(sp => sp.didPay))
-        m.balance = m.didPay - m.shoulPay
-        m.balanceBeforeSettle = m.balance
-        return m
-      })
-  
-      const belewZero = group.members.filter(a => a.balance < 0)
-      const aboveZero = group.members.filter(a => a.balance > 0)
-      const justZero = group.members.filter(a => a.balance === 0)
-      return {
-        belewZero,
-        aboveZero,
-        justZero
+        belewZero[i].balance = 0
       }
+    }
+    return owe
 }
 
 export default calculateDebt
