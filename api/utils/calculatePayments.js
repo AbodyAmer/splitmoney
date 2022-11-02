@@ -4,7 +4,7 @@ import mongoose from "mongoose"
 import { sum } from 'ramda'
 
 const calculatePayments = async (groupId) => {
-    const group = await Group.findById(groupId)
+    const group = await Group.findById(groupId).lean()
     const totalPayments = await Expenses.aggregate([
         {
           $match: {

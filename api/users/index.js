@@ -21,7 +21,15 @@ router.post('/register', async (req, res) => {
         newUser.password = password
         newUser.setPassword(req.body.password);
         await newUser.save()
-        return res.json({ message: 'Success' })
+        const session = new Session()
+        session.useruid = user._id
+        const newSession = await session.save()
+        const token = jwt.sign({ 
+            email: email,
+            name: name,
+            sessionuid: newSession._id.toString()
+         }, process.env.JWT_SECRET);
+        return res.json({ token })
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: error.message })

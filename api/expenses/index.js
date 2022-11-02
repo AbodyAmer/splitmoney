@@ -3,6 +3,7 @@ import Group from '../../models/groups.js'
 import Expenses from '../../models/expenses.js'
 import mongoose from 'mongoose'
 import { isLogged } from '../middelware/index.js'
+import { sum } from 'ramda'
 const router = express.Router()
 
 router.post('/addExpenses', isLogged, async (req, res) => {
@@ -10,7 +11,7 @@ router.post('/addExpenses', isLogged, async (req, res) => {
       const { groupId, paidBy, paymentType, split } = req.body
       const totalAmount = Number(req.body.totalAmount)
       if (!totalAmount) return res.status(400).json({ message: 'Please enter valid totalAmount' })
-      const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(paidBy), mongoose.Types.ObjectId(req.user._id)]} }).lean()
+      const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(paidBy), mongoose.Types.ObjectId(req.user._id)]}, isRemoved: { $ne: true } }).lean()
       if (!group) return res.status(400).json({ message: 'Group not found' })
   
       const validMembers = split.some((member) => group.members.every(m => m.toString() !== member.useruid.toString()))
@@ -44,7 +45,7 @@ router.post('/editExpenses', isLogged, async (req, res) => {
       const { groupId, expensesId, paidBy, paymentType, split } = req.body
       const totalAmount = Number(req.body.totalAmount)
       if (!totalAmount) return res.status(400).json({ message: 'Please enter valid totalAmount' })
-      const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(paidBy), mongoose.Types.ObjectId(req.user._id)]} }).lean()
+      const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(paidBy), mongoose.Types.ObjectId(req.user._id)]}, isRemoved: { $ne: true } }).lean()
       if (!group) return res.status(400).json({ message: 'Group not found' })
   
       const validMembers = split.some((member) => group.members.every(m => m.toString() !== member.useruid.toString()))
@@ -77,7 +78,7 @@ router.post('/editExpenses', isLogged, async (req, res) => {
 router.post('/deleteExpenses', isLogged, async (req, res) => {
     try {
     const { groupId, expensesId } = req.body
-    const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id)]} }).lean()
+    const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id)]}, isRemoved: { $ne: true } }).lean()
     if (!group) return res.status(400).json({ message: 'Group not found' })
     const response = await Expenses.updateOne({ 
         _id: mongoose.Types.ObjectId(expensesId),

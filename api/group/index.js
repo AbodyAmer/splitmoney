@@ -1,4 +1,5 @@
 import Group from '../../models/groups.js'
+import Expenses from '../../models/expenses.js'
 import express from 'express'
 import { isLogged } from '../middelware/index.js'
 import mongoose from 'mongoose'
@@ -65,7 +66,7 @@ router.post('/deleteMember', isLogged, async (req, res) => {
 router.post('/delete', isLogged, async (req, res) => {
     try {
         const { groupId } = req.body
-        const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id)]} }).lean()
+        const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id)]}, isRemoved: { $ne: true } }).lean()
         if (!group) return res.status(400).json({ message: 'Group or member not found'})
         const { justZero } = await calculatePayments(groupId)
         const everyoneDone = group.members.every(member => justZero.find(m => m.toString() === member.toString()))
@@ -82,13 +83,63 @@ router.post('/delete', isLogged, async (req, res) => {
 
 router.get('/mygroups', isLogged, async (req, res) => {
     try {
-        const groups = await Group.find({ members: { $in: [mongoose.Types.ObjectId(req.user._id)]} }).lean()
+        const groups = await Group.find({ members: { $in: [mongoose.Types.ObjectId(req.user._id)]}, isRemoved: { $ne: true } }).populate({
+            path: 'members',
+            select: 'name'
+        }).lean()
         const g = await Promise.all(groups.map(async group => {
             const { aboveZero, belewZero } = await calculatePayments(group._id)
             group.own = calculateDebt(belewZero, aboveZero)
+            let mydebt
+            const borrow = belewZero.find(bz => bz._id.toString() === req.user._id.toString())
+            const lend = aboveZero.find(bz => bz._id.toString() === req.user._id.toString())
+            if (lend) {
+                mydebt = lend.balanceBeforeSettle
+            } else if (borrow) {
+                mydebt = borrow.balanceBeforeSettle
+            } else {
+                mydebt = 0
+            }
+            group.mydebt = mydebt
             return group
         }))
         return res.json(g)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'Internal server error' }) 
+    }
+})
+
+router.get('/:id', isLogged, async (req, res) => {
+    try {
+        const group = await Group.findOne({ _id: mongoose.Types.ObjectId(req.params.id), members: { $in: [mongoose.Types.ObjectId(req.user._id)]}, isRemoved: { $ne: true }  }).populate({
+            path: 'members',
+            select: 'name'
+        }).lean()
+        if (!group) return res.status(400).json({ message: 'Group not found' })
+        const { aboveZero, belewZero } = await calculatePayments(group._id)
+        group.own = calculateDebt(belewZero, aboveZero)
+        let mydebt
+        const borrow = belewZero.find(bz => bz._id.toString() === req.user._id.toString())
+        const lend = aboveZero.find(bz => bz._id.toString() === req.user._id.toString())
+        if (lend) {
+            mydebt = lend.balanceBeforeSettle
+        } else if (borrow) {
+            mydebt = borrow.balanceBeforeSettle
+        } else {
+            mydebt = 0
+        }
+        group.mydebt = mydebt
+
+        const expenses = await Expenses.find({ group: group._id, isRemoved: { $ne: true } }).populate({
+            path: 'paidBy',
+            select: 'name'
+        }).populate({
+            path: 'split.useruid',
+            select: 'name'
+        }).lean()
+        group.expenses = expenses
+        return res.json(group)
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: 'Internal server error' }) 
