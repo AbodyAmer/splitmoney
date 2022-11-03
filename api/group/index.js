@@ -5,13 +5,17 @@ import { isLogged } from '../middelware/index.js'
 import mongoose from 'mongoose'
 import calculatePayments from '../utils/calculatePayments.js'
 import calculateDebt from '../utils/calculateDebt.js'
+import { body, validationResult } from 'express-validator';
 
 const router = express.Router()
 
-router.post('/createGroup', isLogged, async (req, res) => {
+router.post('/createGroup', [isLogged, body('name').notEmpty()], async (req, res) => {
     try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
         const { name } = req.body
-        if (!name) return res.status(400).json({ message: 'Please enter group name' })
         const group = new Group({
             name,
             members: [req.user._id],
@@ -44,8 +48,12 @@ router.post('/join/:inviteLink', isLogged, async (req, res) => {
     }
 })
 
-router.post('/deleteMember', isLogged, async (req, res) => {
+router.post('/deleteMember', [isLogged, body('groupId').isMongoId(), body('memberId').isMongoId()], async (req, res) => {
     try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
         const { groupId, memberId } = req.body
         const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id), mongoose.Types.ObjectId(memberId)]} }).lean()
         if (!group) return res.status(400).json({ message: 'Group or member not found'})
@@ -63,8 +71,12 @@ router.post('/deleteMember', isLogged, async (req, res) => {
     }
 })
 
-router.post('/delete', isLogged, async (req, res) => {
+router.post('/delete', [isLogged, body('groupId').isMongoId()], async (req, res) => {
     try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
         const { groupId } = req.body
         const group = await Group.findOne({ _id: mongoose.Types.ObjectId(groupId), members: { $in: [mongoose.Types.ObjectId(req.user._id)]}, isRemoved: { $ne: true } }).lean()
         if (!group) return res.status(400).json({ message: 'Group or member not found'})
